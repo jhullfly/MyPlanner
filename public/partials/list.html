@@ -1,0 +1,14 @@
+<table>
+  <tr>
+	  <td>name</td>
+	  <td>inPhoto</td>
+      <td>photoTaken</td>
+      <td>tookPhoto</td>
+  </tr>
+  <tr ng-repeat="relation in relations">
+      <td>{{relation.getFriendName()}}</td>
+      <td>{{relation.getInPhoto()}}</td>
+      <td>{{relation.getPhotoTaken()}}</td>
+      <td>{{relation.getTookPhoto()}}</td>
+  </tr>
+</table>

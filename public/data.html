@@ -1,1 +1,21 @@
-Show data here.
+<html ng-app="myPlannerApp">
+<head>
+    <title>Booking Camping Sites</title>
+    <link rel="stylesheet" href="css/app.css">
+
+    <script src="http://www.parsecdn.com/js/parse-1.2.18.min.js"></script>
+    <script>
+        Parse.initialize("4GrpOttZYHYF3ibdfPy8sBpM6AicBW2HpsvygDJZ", "bKgObet82XgL86hRav0AIgMKlGlVzr4wzkR5vJ7j");
+    </script>
+    <script src="bower_components/angular/angular.js"></script>
+    <script src="bower_components/angular-route/angular-route.js"></script>
+    <script src="bower_components/angular-resource/angular-resource.js"></script>
+    <script src="bower_components/parse-angular-patch/dist/parse-angular.js"></script>
+    <script src="js/utils.js"></script>
+    <script src="js/app.js"></script>
+    <script src="js/controllers.js"></script>
+</head>
+<body>
+<div ng-view></div>
+</body>
+</html>
