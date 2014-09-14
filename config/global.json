@@ -1,0 +1,14 @@
+{
+    "applications": {
+        "My Planner": {
+            "applicationId": "4GrpOttZYHYF3ibdfPy8sBpM6AicBW2HpsvygDJZ", 
+            "masterKey": "NIkVNDrG5wjQLJewGSwIReSw7Y4j45QBk3Xp8xdW"
+        }, 
+        "_default": {
+            "link": "My Planner"
+        }
+    }, 
+    "global": {
+        "parseVersion": "1.3.0"
+    }
+}

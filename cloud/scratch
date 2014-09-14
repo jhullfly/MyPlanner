@@ -1,0 +1,6 @@
+curl -k -X POST \
+  -H "X-Parse-Application-Id: 4GrpOttZYHYF3ibdfPy8sBpM6AicBW2HpsvygDJZ" \
+  -H "X-Parse-REST-API-Key: GW3CrdsdpRe9yFIKo5bDrfBSi4izEq21k5KlJs7a" \
+  -H "Content-Type: application/json" \
+  -d '{"jobName":"PhotoAnalyzer", "userId":"MCQLOZlYGv"}' \
+  https://api.parse.com/1/functions/CallBackgroundJob

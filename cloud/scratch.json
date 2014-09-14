@@ -1,0 +1,23 @@
+{"localStorage": {}, "console": {}, "process": {}, "_installationId": "", "Parse": {
+    "VERSION": "js1.3.0",
+    "serverURL": "https://api.parse.com",
+    "_installationId": "cl0udc0d-3cl0-udc0-d3cl-0udc0d3cl0ud",
+    "Analytics": {},
+    "Events": {},
+    "FacebookUtils": {},
+    "Push": {},
+    "localStorage": {},
+    "Cloud": {
+        "_JSON": {},
+        "_modules": {
+            "buffer.js": {
+                "INSPECT_MAX_BYTES": 50
+            },
+            "node_util.js": {}
+        }
+    },
+    "applicationId": "4GrpOttZYHYF3ibdfPy8sBpM6AicBW2HpsvygDJZ",
+    "javaScriptKey": "bKgObet82XgL86hRav0AIgMKlGlVzr4wzkR5vJ7j",
+    "masterKey": "NIkVNDrG5wjQLJewGSwIReSw7Y4j45QBk3Xp8xdW",
+    "_useMasterKey": false
+}}
