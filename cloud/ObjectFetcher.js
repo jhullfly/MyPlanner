@@ -61,10 +61,11 @@ function ObjectFetcher(user) {
 
     }
     this.saveObject = function(object, type) {
-        if (type == 'Photo') {
-            return this.savePhoto(object);
-        } else if (type == 'Feed') {
-            return this.saveFeed(object);
+        var that = this;
+        if (that.type == 'Photo') {
+            return that.savePhoto(object);
+        } else if (that.type == 'Feed') {
+            return that.saveFeed(object);
         } else {
             return Parse.Promise.error("unknown object type '"+type+"'");
         }

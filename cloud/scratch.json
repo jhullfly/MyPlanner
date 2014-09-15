@@ -1,23 +1,16 @@
-{"localStorage": {}, "console": {}, "process": {}, "_installationId": "", "Parse": {
-    "VERSION": "js1.3.0",
-    "serverURL": "https://api.parse.com",
-    "_installationId": "cl0udc0d-3cl0-udc0-d3cl-0udc0d3cl0ud",
-    "Analytics": {},
-    "Events": {},
-    "FacebookUtils": {},
-    "Push": {},
-    "localStorage": {},
-    "Cloud": {
-        "_JSON": {},
-        "_modules": {
-            "buffer.js": {
-                "INSPECT_MAX_BYTES": 50
-            },
-            "node_util.js": {}
+{"created_time": "2014-09-14T17:02:36+0000", "from": {
+    "id": "10154630786530360",
+    "name": "Jesse Hull"
+}, "id": "10154630786530360_10154641463175360", "link": "https://www.facebook.com/events/771080272934133/", "privacy": {
+    "value": ""
+}, "story": "Jesse Hull went to an event.", "story_tags": {
+    "0": [
+        {
+            "id": "10154630786530360",
+            "length": 10,
+            "name": "Jesse Hull",
+            "offset": 0,
+            "type": "user"
         }
-    },
-    "applicationId": "4GrpOttZYHYF3ibdfPy8sBpM6AicBW2HpsvygDJZ",
-    "javaScriptKey": "bKgObet82XgL86hRav0AIgMKlGlVzr4wzkR5vJ7j",
-    "masterKey": "NIkVNDrG5wjQLJewGSwIReSw7Y4j45QBk3Xp8xdW",
-    "_useMasterKey": false
-}}
+    ]
+}, "type": "link", "updated_time": "2014-09-14T17:02:36+0000"}

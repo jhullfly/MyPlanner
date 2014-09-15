@@ -1,5 +1,5 @@
 <div id="userinfo">
-    Logged in as {{user.get("name")}}. <a href="#" ng-click="logout()">Logout</a>
+    Logged in as {{user.get("name")}}. <a class="button" ng-click="logout()">Logout</a>
 </div>
 
 <div ng-show="relations && relations.length == 0">
@@ -9,7 +9,7 @@
 <table ng-show="relations && relations.length != 0">
     <thead>
         <tr>
-            <th ng-repeat="column in columns" ng:class="selectedCls($index)" ng:click="changeSorting($index)">{{column}}</th>
+            <th ng-repeat="column in columns" ng-class="selectedCls($index)" ng-click="changeSorting($index)">{{column}}</th>
         </tr>
     </thead>
     <tbody>

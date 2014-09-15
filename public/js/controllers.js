@@ -1,11 +1,15 @@
 var myPlannerAppControllers = angular.module('myPlannerAppControllers', []);
 
+function getDataColumns() {
+    return ['friendName', 'inPhoto', 'photoTaken', 'tookPhoto', 'iCommented', 'theyCommented', 'iLiked', 'theyLiked', 'iPosted', 'theyPosted'];
+}
+
 myPlannerAppControllers.factory('ParseObjectFactory', function() {
 	return {
 		buildFriendRelation : function() {
 			return Parse.Object.extend({
 				className: "FriendRelation",
-				attrs: ['friendName', 'inPhoto', 'photoTaken', 'tookPhoto']
+				attrs: getDataColumns()
 			});
 		}
 	}
@@ -28,7 +32,7 @@ function ($scope, $timeout, $location, ParseObjectFactory) {
         } else {
             query.ascending($scope.columns[$scope.sort.column]);
         }
-        query.limit(500);
+        query.limit(2000);
         query.find({
             success:function(results) {
                 $scope.relations= results;
@@ -60,7 +64,7 @@ function ($scope, $timeout, $location, ParseObjectFactory) {
 
     var FriendRelation = ParseObjectFactory.buildFriendRelation();
     $scope.user = Parse.User.current();
-    $scope.columns = ['friendName', 'inPhoto', 'photoTaken', 'tookPhoto'];
+    $scope.columns = getDataColumns();
     $scope.sort = {
         column: 1,
         descending: true
@@ -84,7 +88,7 @@ function ($scope, $location, ParseObjectFactory) {
             success: function(user) {
                 console.log("User logged in through Facebook! " + JSON.stringify(user.get("authData")));
                 Parse.Cloud.run("CallBackgroundJob", {
-                    jobName : 'PhotoAnalyzer',
+                    jobName : 'FeedAnalyzer',
                     userId : user.id
                 }).then(function() {
                     FB.api('/me', function (response) {
