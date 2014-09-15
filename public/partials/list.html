@@ -1,4 +1,12 @@
-<table>
+<div id="userinfo">
+    Logged in as {{user.get("name")}}. <a href="#" ng-click="logout()">Logout</a>
+</div>
+
+<div ng-show="relations && relations.length == 0">
+    Loading data. It takes a while be patient...
+</div>
+
+<table ng-show="relations && relations.length != 0">
     <thead>
         <tr>
             <th ng-repeat="column in columns" ng:class="selectedCls($index)" ng:click="changeSorting($index)">{{column}}</th>
@@ -6,10 +14,7 @@
     </thead>
     <tbody>
           <tr ng-repeat="relation in relations | orderBy:orderByFunc:sort.descending">
-              <td>{{relation.getFriendName()}}</td>
-              <td>{{relation.getInPhoto()}}</td>
-              <td>{{relation.getPhotoTaken()}}</td>
-              <td>{{relation.getTookPhoto()}}</td>
+              <td ng-repeat="column in columns">{{relation.get(column)}}</td>
           </tr>
     </tbody>
 </table>

@@ -3,29 +3,27 @@ var _ = require('underscore');
 function PhotoAnalyzer(user) {
     this.user = user;
     this.friendRelations = {};
-    this.analyze = function() {
+    this.analyze = function(skip) {
+        skip = skip || 0;
         var that = this;
+        var batchSize = 50;
         var Photo = Parse.Object.extend("Photo");
         var query = new Parse.Query(Photo);
         query.equalTo("user", that.user);
-        query.notEqualTo("analyzed", true);
         query.ascending("createdAt");
-        query.limit(1000);
+        query.skip(skip);
+        query.limit(batchSize);
         return query.find().then( function (photos) {
             console.log("Analyzing " + photos.length);
-            var promises = [];
             _.each(photos, function(photo) {
-                promises.push(that.analyzePhoto(photo));
+                that.analyzePhoto(photo);
             });
-            return Parse.Promise.when(promises);
-        }).then( function() {
-            console.log("Analyzed " + arguments.length);
-            if (arguments.length != 0) {
-                // did something so get some more.
-                return that.analyze();
+            if (photos.length != 0) {
+                return that.analyze(skip+batchSize);
+            } else {
+                console.log("Saving");
+                return that.saveRelations();
             }
-            console.log("Saving");
-            return that.saveRelations();
         });
     }
     this.saveRelations = function() {
@@ -85,8 +83,6 @@ function PhotoAnalyzer(user) {
                 that.addRelation(taker, "tookPhoto");
             }
         }
-        photo.set("analyzed", true);
-        return photo.save();
     }
     this.inPhoto = function(photo) {
         var that = this;

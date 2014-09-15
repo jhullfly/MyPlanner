@@ -1,5 +1,5 @@
 var _ = require('underscore');
-var PF = require('cloud/PhotoFetcher.js');
+var OF = require('cloud/ObjectFetcher.js');
 var PA = require('cloud/PhotoAnalyzer.js');
 function getStandardErrorFunction(status) {
     return function(object, error) {
@@ -49,10 +49,10 @@ Parse.Cloud.job("FetchAndAnalyzePhotos", function(request, status) {
     Parse.Cloud.useMasterKey();
     var query = new Parse.Query(extendUser());
     query.get(request.params.userId).then(function(user) {
-        var photoFetcher = new PF.PhotoFetcher(user, 2000);
+        var objectFetcher = new OF.ObjectFetcher(user);
         var photoAnalyzer = new PA.PhotoAnalyzer(user);
-        return photoFetcher.fetchPhotosTaggedIn().then(function() {
-            return photoFetcher.fetchPhotosTaken();
+        return objectFetcher.fetchPhotosTaggedIn(100).then(function() {
+            return objectFetcher.fetchPhotosTaken(100);
         }).then( function() {
             return photoAnalyzer.analyze();
         });
@@ -66,12 +66,34 @@ Parse.Cloud.job("PhotoFetcher", function(request, status) {
     Parse.Cloud.useMasterKey();
     var query = new Parse.Query(extendUser());
     query.get(request.params.userId).then(function(user) {
-        var photoFetcher = new PF.PhotoFetcher(user, 2000);
-        return photoFetcher.fetchPhotosTaggedIn().then(function() {
-            return photoFetcher.fetchPhotosTaken();
+        var objectFetcher = new OF.ObjectFetcher(user);
+        return objectFetcher.fetchPhotosTaggedIn(100).then(function() {
+            return objectFetcher.fetchPhotosTaken(100);
         });
     }).then(function() {status.success("Worked");},
-            getStandardErrorFunction(status)
+        getStandardErrorFunction(status)
+    );
+});
+
+Parse.Cloud.job("FeedFetcher", function(request, status) {
+    Parse.Cloud.useMasterKey();
+    var query = new Parse.Query(extendUser());
+    query.get(request.params.userId).then(function(user) {
+        var objectFetcher = new OF.ObjectFetcher(user);
+        return objectFetcher.fetchFeed(5000);
+    }).then(function() {status.success("Worked");},
+        getStandardErrorFunction(status)
+    );
+});
+
+Parse.Cloud.job("HomeFetcher", function(request, status) {
+    Parse.Cloud.useMasterKey();
+    var query = new Parse.Query(extendUser());
+    query.get(request.params.userId).then(function(user) {
+        var objectFetcher = new OF.ObjectFetcher(user);
+        return objectFetcher.fetchHome(5000);
+    }).then(function() {status.success("Worked");},
+        getStandardErrorFunction(status)
     );
 });
 
