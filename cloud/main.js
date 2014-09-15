@@ -45,17 +45,25 @@ Parse.Cloud.define("CallBackgroundJob", function(request, response) {
     });
 });
 
-Parse.Cloud.job("FetchAndAnalyzePhotos", function(request, status) {
+Parse.Cloud.job("DoEverything", function(request, status) {
     Parse.Cloud.useMasterKey();
     var query = new Parse.Query(extendUser());
     query.get(request.params.userId).then(function(user) {
         var objectFetcher = new OF.ObjectFetcher(user);
         var photoAnalyzer = new OA.ObjectAnalyzer(user, "Photo");
-        return objectFetcher.fetchPhotosTaggedIn(1000).then(function() {
+        var feedAnalyzer = new OA.ObjectAnalyzer(user, "Feed");
+        return objectFetcher.fetchPhotosTaggedIn(1000)
+        .then(function() {
             return objectFetcher.fetchPhotosTaken(1000);
         }).then( function() {
             return photoAnalyzer.analyze();
-        });
+        }).then( function() {
+            return objectFetcher.fetchFeed(1000);
+        }).then( function() {
+            return objectFetcher.fetchHome(1000);
+        }).then( function() {
+            return feedAnalyzer.analyze();
+        })
     }).then(function() {
             status.success("Worked");
         }, getStandardErrorFunction(status)

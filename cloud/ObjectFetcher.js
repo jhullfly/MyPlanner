@@ -62,9 +62,9 @@ function ObjectFetcher(user) {
     }
     this.saveObject = function(object, type) {
         var that = this;
-        if (that.type == 'Photo') {
+        if (type == 'Photo') {
             return that.savePhoto(object);
-        } else if (that.type == 'Feed') {
+        } else if (type == 'Feed') {
             return that.saveFeed(object);
         } else {
             return Parse.Promise.error("unknown object type '"+type+"'");
