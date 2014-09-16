@@ -57,16 +57,18 @@ function ObjectAnalyzer(user, type) {
     }
     this.saveRelations = function() {
         var that = this;
-        var promises = [];
+        var promise = Parse.Promise.as();
         for(friendFbId in that.friendRelations) {
-            promises.push(that.getDbFriendRelation(friendFbId, that.friendRelations[friendFbId].name).then(function (relation, friendFbId2) {
-                _.each(that.possibleRelations, function (relationType) {
-                    relation.set(relationType, that.friendRelations[friendFbId2][relationType]+relation.get(relationType));
-                })
-                return relation.save();
-            }));
+            promise = promise.then(function () {
+                that.getDbFriendRelation(friendFbId, that.friendRelations[friendFbId].name)
+                 .then(function (relation, friendFbId2) {
+                    _.each(that.possibleRelations, function (relationType) {
+                        relation.set(relationType, that.friendRelations[friendFbId2][relationType]+relation.get(relationType));
+                    })
+                    return relation.save();
+            })});
         }
-        return Parse.Promise.when(promises);
+        return promise;
     }
 
     this.getDbFriendRelation = function(friendFbId, name) {
@@ -90,8 +92,12 @@ function ObjectAnalyzer(user, type) {
     }
 
     this.dumpRelation = function(msg, relation) {
-        console.log(msg + " " + relation.get("userFbId") + " " + relation.get("friendFbId") + " " + relation.get("friendName") +
-            " " + relation.get("inPhoto")+ " " + relation.get("photoTaken")+ " " + relation.get("tookPhoto"));
+        var that = this;
+        msg += " " + relation.get("userFbId") + " " + relation.get("friendFbId") +  " " + relation.get("friendName");
+        _.each(that.possibleRelations, function (relationType) {
+            msg += " " + relation.get(relationType);
+        })
+        console.log(msg);
     }
 
     this.analyzeObject = function(object) {

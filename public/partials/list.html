@@ -13,7 +13,7 @@
         </tr>
     </thead>
     <tbody>
-          <tr ng-repeat="relation in relations | orderBy:orderByFunc:sort.descending">
+          <tr ng-repeat="relation in relations | orderBy:[orderByFunc,relation.get('friendName')]:sort.descending">
               <td ng-repeat="column in columns">{{relation.get(column)}}</td>
           </tr>
     </tbody>

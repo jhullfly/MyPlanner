@@ -1,15 +1,25 @@
 var _ = require('underscore');
 var OF = require('cloud/ObjectFetcher.js');
 var OA = require('cloud/ObjectAnalyzer.js');
-function getStandardErrorFunction(status) {
+
+
+function errorFunc(status) {
     return function(object, error) {
+        console.log("Error object = "+JSON.stringify(object));
+        console.log("Error error = "+JSON.stringify(error));
         if (error) {
-            status.error(error);
+            status.error(object.text.substring(0,1000) + error);
         } else if (object && object.text) {
             status.error(object.text.substring(0,1000));
         } else {
             status.error(JSON.stringify(object).substring(0,1000));
         }
+    };
+}
+function successFunc(status) {
+    return function() {
+        console.log("worked");
+        status.success("worked");
     };
 }
 
@@ -64,10 +74,7 @@ Parse.Cloud.job("DoEverything", function(request, status) {
         }).then( function() {
             return feedAnalyzer.analyze();
         })
-    }).then(function() {
-            status.success("Worked");
-        }, getStandardErrorFunction(status)
-    );
+    }).then(successFunc(status), errorFunc(status));
 });
 
 Parse.Cloud.job("PhotoFetcher", function(request, status) {
@@ -78,9 +85,7 @@ Parse.Cloud.job("PhotoFetcher", function(request, status) {
         return objectFetcher.fetchPhotosTaggedIn(1000).then(function() {
             return objectFetcher.fetchPhotosTaken(1000);
         });
-    }).then(function() {status.success("Worked");},
-        getStandardErrorFunction(status)
-    );
+    }).then(successFunc(status), errorFunc(status));
 });
 
 Parse.Cloud.job("FeedFetcher", function(request, status) {
@@ -89,9 +94,7 @@ Parse.Cloud.job("FeedFetcher", function(request, status) {
     query.get(request.params.userId).then(function(user) {
         var objectFetcher = new OF.ObjectFetcher(user);
         return objectFetcher.fetchFeed(1000);
-    }).then(function() {status.success("Worked");},
-        getStandardErrorFunction(status)
-    );
+    }).then(successFunc(status), errorFunc(status));
 });
 
 Parse.Cloud.job("HomeFetcher", function(request, status) {
@@ -100,9 +103,7 @@ Parse.Cloud.job("HomeFetcher", function(request, status) {
     query.get(request.params.userId).then(function(user) {
         var objectFetcher = new OF.ObjectFetcher(user);
         return objectFetcher.fetchHome(1000);
-    }).then(function() {status.success("Worked");},
-        getStandardErrorFunction(status)
-    );
+    }).then(successFunc(status), errorFunc(status));
 });
 
 Parse.Cloud.job("PhotoAnalyzer", function(request, status) {
@@ -111,9 +112,7 @@ Parse.Cloud.job("PhotoAnalyzer", function(request, status) {
     query.get(request.params.userId).then(function(user) {
         var photoAnalyzer = new OA.ObjectAnalyzer(user, "Photo");
         return photoAnalyzer.analyze();
-    }).then(function() {status.success("Worked");},
-            getStandardErrorFunction(status)
-    );
+    }).then(successFunc(status), errorFunc(status));
 });
 
 Parse.Cloud.job("FeedAnalyzer", function(request, status) {
@@ -122,9 +121,18 @@ Parse.Cloud.job("FeedAnalyzer", function(request, status) {
     query.get(request.params.userId).then(function(user) {
         var feedAnalyzer = new OA.ObjectAnalyzer(user, "Feed");
         return feedAnalyzer.analyze();
-    }).then(function() {status.success("Worked");},
-        getStandardErrorFunction(status)
-    );
+    }).then(successFunc(status), errorFunc(status));
 });
 
+Parse.Cloud.job("AllAnalyzer", function(request, status) {
+    Parse.Cloud.useMasterKey();
+    var query = new Parse.Query(extendUser());
+    query.get(request.params.userId).then(function(user) {
+        var feedAnalyzer = new OA.ObjectAnalyzer(user, "Feed");
+        var photoAnalyzer = new OA.ObjectAnalyzer(user, "Photo");
+        return photoAnalyzer.analyze().then( function () {
+            return feedAnalyzer.analyze();
+        });
+    }).then(successFunc(status), errorFunc(status));
+});
 
