@@ -1,7 +1,7 @@
 var myPlannerAppControllers = angular.module('myPlannerAppControllers', []);
 
 function getDataColumns() {
-    return ['friendName', 'inPhoto', 'photoTaken', 'tookPhoto', 'iCommented', 'theyCommented', 'iLiked', 'theyLiked', 'iPosted', 'theyPosted'];
+    return ['friendName', 'inPhotoWith', 'iTookPhoto', 'theyTookPhoto', 'iLikedPhotoIn', 'theyLikedPhotoIn', 'iLikedPhotoTook', 'theyLikedPhotoTook'];
 }
 
 myPlannerAppControllers.factory('ParseObjectFactory', function() {
@@ -9,7 +9,14 @@ myPlannerAppControllers.factory('ParseObjectFactory', function() {
 		buildFriendRelation : function() {
 			return Parse.Object.extend({
 				className: "FriendRelation",
-				attrs: getDataColumns()
+				attrs: ['friendName', 'data'],
+                getData: function(attr) {
+                    if (attr == 'friendName') {
+                        return this.get('friendName');
+                    } else {
+                        return this.get('data')[attr];
+                    }
+                }
 			});
 		}
 	}
@@ -25,23 +32,27 @@ function ($scope, $timeout, $location, ParseObjectFactory) {
 
     $scope.fetchData = function() {
         $scope.fetchCount++;
+        fetchInternal([], 0);
+    }
+
+    function fetchInternal(resultsSoFar, skip) {
+        var batchSize = 10;
         var query = new Parse.Query(FriendRelation);
         query.equalTo("userFbId", parseInt(Parse.User.current().get("authData").facebook.id));
-        if ($scope.sort.descending) {
-            query.descending($scope.columns[$scope.sort.column]);
-        } else {
-            query.ascending($scope.columns[$scope.sort.column]);
-        }
-        query.addAscending('friendName');
-        query.limit(2000);
-        query.find({
-            success:function(results) {
-                $scope.relations= results;
+        query.limit(batchSize);
+        query.skip(skip);
+        query.find().then(function (results) {
+            if (results.length == 0) {
+                $scope.relations= resultsSoFar;
                 $timeout($scope.fetchData, 10*1000);
-            },
-            error:function(error) {
-                console.error("Error: " + error.code + " " + error.message);
+                return Parse.Promise.as();
+            } else {
+                resultsSoFar = resultsSoFar.concat(results);
+                skip = skip + batchSize;
+                return fetchInternal(resultsSoFar, skip)
             }
+        }, function(error) {
+            console.error("Error: " + error.code + " " + error.message);
         });
     }
 
@@ -60,7 +71,7 @@ function ($scope, $timeout, $location, ParseObjectFactory) {
     };
 
     $scope.orderByFunc = function(relation) {
-        return relation.get($scope.columns[$scope.sort.column]);
+        return relation.getData([$scope.columns[$scope.sort.column]]);
     }
 
     var FriendRelation = ParseObjectFactory.buildFriendRelation();
@@ -89,7 +100,7 @@ function ($scope, $location, ParseObjectFactory) {
             success: function(user) {
                 console.log("User logged in through Facebook! " + JSON.stringify(user.get("authData")));
                 Parse.Cloud.run("CallBackgroundJob", {
-                    jobName : 'AllAnalyzer',
+                    jobName : 'PhotoAnalyzer',
                     userId : user.id
                 }).then(function() {
                     FB.api('/me', function (response) {

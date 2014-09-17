@@ -5,8 +5,8 @@ var OA = require('cloud/ObjectAnalyzer.js');
 
 function errorFunc(status) {
     return function(object, error) {
-        console.log("Error object = "+JSON.stringify(object));
-        console.log("Error error = "+JSON.stringify(error));
+        //console.log("Error object = "+JSON.stringify(object));
+        //console.log("Error error = "+JSON.stringify(error));
         if (error) {
             status.error(object.text.substring(0,1000) + error);
         } else if (object && object.text) {
