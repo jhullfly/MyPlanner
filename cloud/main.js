@@ -135,4 +135,3 @@ Parse.Cloud.job("AllAnalyzer", function(request, status) {
         });
     }).then(successFunc(status), errorFunc(status));
 });
-
