@@ -1,21 +1,23 @@
 var _ = require('underscore');
 
 function ObjectAnalyzer(user, type) {
+    var that = this;
     this.user = user;
     this.type = type;
     this.objectsAnalyzed = null;
     this.analyzedCount = 0;
     this.friendRelations = {};
-    this.possibleRelations = ['inPhoto', 'photoTaken', 'tookPhoto', 'iCommented', 'theyCommented', 'iLiked', 'theyLiked', 'iPosted', 'theyPosted'];
+    this.possibleRelations = ['inPhotoWith', 'iTookPhoto', 'theyTookPhoto',
+        'iLikedPhotoIn', 'theyLikedPhotoIn', 'iLikedPhotoTook', 'theyLikedPhotoTook'];
+//        'iCommentedPhotoIn', 'theyCommentedPhotoIn', 'iCommentedPhotoTook', 'theyCommentedPhotoTook'
+
     this.analyze = function() {
-        var that = this;
         return that.initializeObjectsAnalyzed().then(function () {
             return that.analyzeFrom(0);
         });
     }
 
     this.analyzeFrom = function(skip) {
-        var that = this;
         var batchSize = 1000;
         var Object = Parse.Object.extend(that.type);
         var query = new Parse.Query(Object);
@@ -26,7 +28,7 @@ function ObjectAnalyzer(user, type) {
         return query.find().then( function (objects) {
             console.log("Retrieved " + objects.length + ' ' + that.type);
             _.each(objects, function(object) {
-                if (!_.contains(that.getAnalyzedIds(), object.id)) {
+                if (!_.contains(that.getAnalyzedIds(), object.get("data").id)) {
                     that.analyzeObject(object);
                 }
             });
@@ -41,7 +43,6 @@ function ObjectAnalyzer(user, type) {
         });
     }
     this.initializeObjectsAnalyzed = function() {
-        var that = this;
         var Analyzed = Parse.Object.extend("Analyzed");
         var query = new Parse.Query(Analyzed);
         query.equalTo("user", that.user);
@@ -56,23 +57,24 @@ function ObjectAnalyzer(user, type) {
         });
     }
     this.saveRelations = function() {
-        var that = this;
-        var promise = Parse.Promise.as();
-        for(friendFbId in that.friendRelations) {
-            promise = promise.then(function () {
-                that.getDbFriendRelation(friendFbId, that.friendRelations[friendFbId].name)
-                 .then(function (relation, friendFbId2) {
+        var promises = [];
+        _.each(that.friendRelations, function(friendRelation, friendFbId) {
+            promises.push(that.getDbFriendRelation(friendFbId, friendRelation.name)
+                .then(function (relation) {
+                    var data = relation.get("data");
                     _.each(that.possibleRelations, function (relationType) {
-                        relation.set(relationType, that.friendRelations[friendFbId2][relationType]+relation.get(relationType));
-                    })
-                    return relation.save();
-            })});
-        }
-        return promise;
+                        data[relationType] = friendRelation[relationType] + data[relationType];
+                    });
+                    return Parse.Promise.as(relation);
+                })
+            );
+        });
+        return Parse.Promise.when(promises).then(function () {
+            return Parse.Object.saveAll(arguments);
+        });
     }
 
     this.getDbFriendRelation = function(friendFbId, name) {
-        var that = this;
         var FriendRelation = Parse.Object.extend("FriendRelation");
         var query = new Parse.Query(FriendRelation);
         query.equalTo("userFbId", that.user.getFbId());
@@ -83,25 +85,25 @@ function ObjectAnalyzer(user, type) {
                 relation.set("userFbId", user.getFbId());
                 relation.set("friendFbId", parseInt(friendFbId));
                 relation.set("friendName", name);
+                var data = {};
                 _.each(that.possibleRelations, function (relationType) {
-                    relation.set(relationType, 0);
+                    data[relationType]= 0;
                 });
+                relation.set("data", data);
             }
             return Parse.Promise.as(relation, friendFbId);
         });
     }
 
     this.dumpRelation = function(msg, relation) {
-        var that = this;
         msg += " " + relation.get("userFbId") + " " + relation.get("friendFbId") +  " " + relation.get("friendName");
         _.each(that.possibleRelations, function (relationType) {
-            msg += " " + relation.get(relationType);
+            msg += " " + relation.get("data")[relationType];
         })
         console.log(msg);
     }
 
     this.analyzeObject = function(object) {
-        var that = this;
         if (that.type == "Photo") {
             that.analyzePhoto(object);
         } else if (that.type == "Feed") {
@@ -111,8 +113,8 @@ function ObjectAnalyzer(user, type) {
         }
     }
 
-    this.getAnalyzedIds = function() {
-        var that = this;
+    this.getAnalyzedIds = function(type) {
+        type = type || that.type;
         if (that.type == "Photo") {
             return that.objectsAnalyzed.get("photoIds");
         } else if (that.type == "Feed") {
@@ -124,10 +126,9 @@ function ObjectAnalyzer(user, type) {
     }
 
     this.analyzeFeed = function(feed) {
-        var that = this;
-        that.objectsAnalyzed.get("feedIds").push(feed.id);
-        that.analyzedCount++;
         var feedData = feed.get("data");
+        that.objectsAnalyzed.get("feedIds").push(feedData.id);
+        that.analyzedCount++;
         var from = feedData.from;
         if (feedData.comments) {
             _.each(feedData.comments.data, function (comment) {
@@ -156,17 +157,28 @@ function ObjectAnalyzer(user, type) {
                 }
             });
         }
+        if (feedData.type == 'photo') {
+            if (!_.contains(that.getAnalyzedIds('Photo'), feedData.object_id)) {
+                that.analyzePhotoData(feedData);
+            }
+        }
     }
 
     this.analyzePhoto = function(photo) {
-        var that = this;
-        that.objectsAnalyzed.get("photoIds").push(photo.id);
+        var photoData = photo.get("data");
+        that.objectsAnalyzed.get("photoIds").push(photoData.id);
         that.analyzedCount++;
-        var taker = photo.get("data").from;
+        that.analyzePhotoData(photoData);
+    }
+
+    this.analyzePhotoData = function(photoData) {
+        var taker = photoData.from;
         var selfie = false;
-        if (photo.get("data").tags) {
-            var peopleInPhoto = photo.get("data").tags.data;
-            var relation = that.inPhoto(photo) ? 'inPhoto' : 'photoTaken';
+        var userInPhoto = false;
+        if (photoData.tags) {
+            var peopleInPhoto = photoData.tags.data;
+            userInPhoto = that.inPhoto(photoData);
+            var relation = userInPhoto ? 'inPhotoWith' : 'iTookPhoto';
             for (var i = 0; i < peopleInPhoto.length; i++) {
                 var person = peopleInPhoto[i];
                 that.addRelation(person, relation);
@@ -175,14 +187,41 @@ function ObjectAnalyzer(user, type) {
                 }
             }
             if (!selfie) {
-                that.addRelation(taker, "tookPhoto");
+                that.addRelation(taker, "theyTookPhoto");
             }
+        }
+/*        if (photoData.comments) {
+            _.each(photoData.comments.data, function (comment) {
+                if (that.user.getFbId() == parseInt(from.id)) {
+                    that.addRelation(comment.from, "theyCommented");
+                } else if (that.user.getFbId() == parseInt(comment.from.id)) {
+                    that.addRelation(from, "iCommented");
+                }
+            });
+        }
+*/        if (photoData.likes) {
+            _.each(photoData.likes.data, function (liker) {
+                if (userInPhoto) {
+                    that.addRelation(liker, "theyLikedPhotoIn");
+                } else if (that.user.getFbId() == parseInt(taker.id)) {
+                    that.addRelation(liker, "theyLikedPhotoTook");
+                }
+                if (that.user.getFbId() == parseInt(liker.id)) {
+                    if (photoData.tags) {
+                        _.each(photoData.tags.data, function(person) {
+                            that.addRelation(person, 'iLikedPhotoIn');
+                        });
+                    }
+                    if (!selfie) {
+                        that.addRelation(taker, "iLikedPhotoTook");
+                    }
+                }
+            });
         }
     }
 
-    this.inPhoto = function(photo) {
-        var that = this;
-        var peopleInPhoto = photo.get("data").tags.data;
+    this.inPhoto = function(photoData) {
+        var peopleInPhoto = photoData.tags.data;
         for(var i = 0; i < peopleInPhoto.length; i++) {
             var person = peopleInPhoto[i];
             if (parseInt(person.id) == that.user.getFbId()) {
@@ -192,7 +231,6 @@ function ObjectAnalyzer(user, type) {
         return false;
     }
     this.addRelation = function(person, relation) {
-        var that = this;
         if (!person.id || parseInt(person.id) == that.user.getFbId()) {
             return;
         }
