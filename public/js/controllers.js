@@ -89,7 +89,7 @@ function ($scope, $location, ParseObjectFactory) {
             success: function(user) {
                 console.log("User logged in through Facebook! " + JSON.stringify(user.get("authData")));
                 Parse.Cloud.run("CallBackgroundJob", {
-                    jobName : 'AllAnalyzer',
+                    jobName : 'EventsFetcher',
                     userId : user.id
                 }).then(function() {
                     FB.api('/me', function (response) {

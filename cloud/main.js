@@ -34,6 +34,12 @@ function extendUser() {
     });
 }
 
+function doUserJob(request, status, func) {
+    Parse.Cloud.useMasterKey();
+    var query = new Parse.Query(extendUser());
+    query.get(request.params.userId).then(func).then(successFunc(status), errorFunc(status));
+}
+
 Parse.Cloud.define("CallBackgroundJob", function(request, response) {
     Parse.Cloud.useMasterKey();
     var jobName = request.params.jobName;
@@ -56,9 +62,7 @@ Parse.Cloud.define("CallBackgroundJob", function(request, response) {
 });
 
 Parse.Cloud.job("DoEverything", function(request, status) {
-    Parse.Cloud.useMasterKey();
-    var query = new Parse.Query(extendUser());
-    query.get(request.params.userId).then(function(user) {
+    doUserJob(function(user) {
         var objectFetcher = new OF.ObjectFetcher(user);
         var photoAnalyzer = new OA.ObjectAnalyzer(user, "Photo");
         var feedAnalyzer = new OA.ObjectAnalyzer(user, "Feed");
@@ -74,65 +78,60 @@ Parse.Cloud.job("DoEverything", function(request, status) {
         }).then( function() {
             return feedAnalyzer.analyze();
         })
-    }).then(successFunc(status), errorFunc(status));
+    });
 });
 
 Parse.Cloud.job("PhotoFetcher", function(request, status) {
-    Parse.Cloud.useMasterKey();
-    var query = new Parse.Query(extendUser());
-    query.get(request.params.userId).then(function(user) {
+    doUserJob(function(user) {
         var objectFetcher = new OF.ObjectFetcher(user);
         return objectFetcher.fetchPhotosTaggedIn(1000).then(function() {
             return objectFetcher.fetchPhotosTaken(1000);
         });
-    }).then(successFunc(status), errorFunc(status));
+    });
 });
 
 Parse.Cloud.job("FeedFetcher", function(request, status) {
-    Parse.Cloud.useMasterKey();
-    var query = new Parse.Query(extendUser());
-    query.get(request.params.userId).then(function(user) {
+    doUserJob(function(user) {
         var objectFetcher = new OF.ObjectFetcher(user);
         return objectFetcher.fetchFeed(1000);
-    }).then(successFunc(status), errorFunc(status));
+    });
 });
 
 Parse.Cloud.job("HomeFetcher", function(request, status) {
-    Parse.Cloud.useMasterKey();
-    var query = new Parse.Query(extendUser());
-    query.get(request.params.userId).then(function(user) {
+    doUserJob(function(user) {
         var objectFetcher = new OF.ObjectFetcher(user);
         return objectFetcher.fetchHome(1000);
-    }).then(successFunc(status), errorFunc(status));
+    });
 });
 
 Parse.Cloud.job("PhotoAnalyzer", function(request, status) {
-    Parse.Cloud.useMasterKey();
-    var query = new Parse.Query(extendUser());
-    query.get(request.params.userId).then(function(user) {
+    doUserJob(function(user) {
         var photoAnalyzer = new OA.ObjectAnalyzer(user, "Photo");
         return photoAnalyzer.analyze();
-    }).then(successFunc(status), errorFunc(status));
+    });
 });
 
 Parse.Cloud.job("FeedAnalyzer", function(request, status) {
-    Parse.Cloud.useMasterKey();
-    var query = new Parse.Query(extendUser());
-    query.get(request.params.userId).then(function(user) {
+    doUserJob(function(user) {
         var feedAnalyzer = new OA.ObjectAnalyzer(user, "Feed");
         return feedAnalyzer.analyze();
-    }).then(successFunc(status), errorFunc(status));
+    });
 });
 
 Parse.Cloud.job("AllAnalyzer", function(request, status) {
-    Parse.Cloud.useMasterKey();
-    var query = new Parse.Query(extendUser());
-    query.get(request.params.userId).then(function(user) {
+    doUserJob(request, status, function(user) {
         var feedAnalyzer = new OA.ObjectAnalyzer(user, "Feed");
         var photoAnalyzer = new OA.ObjectAnalyzer(user, "Photo");
         return photoAnalyzer.analyze().then( function () {
             return feedAnalyzer.analyze();
         });
-    }).then(successFunc(status), errorFunc(status));
+    });
+});
+
+Parse.Cloud.job("EventsFetcher", function(request, status) {
+    doUserJob(request, status, function(user) {
+        var objectFetcher = new OF.ObjectFetcher(user);
+        return objectFetcher.fetchEvents(1000);
+    });
 });
 

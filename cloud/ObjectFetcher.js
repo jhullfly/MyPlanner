@@ -22,6 +22,11 @@ function ObjectFetcher(user) {
         var url = 'https://graph.facebook.com/v2.1/me/home?';
         return that.fetchFromUrl(url, maxToFetch, "Feed", 0, 0);
     }
+    this.fetchEvents = function(maxToFetch) {
+        var that = this;
+        var url = 'https://graph.facebook.com/v2.1/me/events?';
+        return that.fetchFromUrl(url, maxToFetch, "Event", 0, 0);
+    }
     this.fetchFromUrl = function(url, maxToFetch, type, fetched, added) {
         var that = this;
         url += '&limit=100&access_token=' + that.user.getFbAccessToken();
@@ -66,6 +71,8 @@ function ObjectFetcher(user) {
             return that.savePhoto(object);
         } else if (type == 'Feed') {
             return that.saveFeed(object);
+        } else if (type == 'Event') {
+            return that.saveEvent(object);
         } else {
             return Parse.Promise.error("unknown object type '"+type+"'");
         }
@@ -107,6 +114,26 @@ function ObjectFetcher(user) {
                 feedDB.set("status_type", feed.status_type);
                 feedDB.set("user", that.user);
                 return feedDB.save().then( function (feedDB) {
+                    return Parse.Promise.as(1);
+                });
+            } else {
+                return Parse.Promise.as(0);
+            }
+        });
+    }
+    this.saveEvent = function(event) {
+        var that = this;
+        var Event = Parse.Object.extend("Event");
+        var query = new Parse.Query(Event);
+        query.equalTo("fbId", event.id);
+        query.equalTo("user", that.user);
+        return query.first().then( function (foundEventDB) {
+            if (!foundEventDB) {
+                var eventDB = new Event();
+                eventDB.set("data", event);
+                eventDB.set("fbId", event.id);
+                eventDB.set("user", that.user);
+                return eventDB.save().then( function (eventDB) {
                     return Parse.Promise.as(1);
                 });
             } else {
