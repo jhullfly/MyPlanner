@@ -1,7 +1,9 @@
 var myPlannerAppControllers = angular.module('myPlannerAppControllers', []);
 
 function getDataColumns() {
-    return ['friendName', 'inPhotoWith', 'iTookPhoto', 'theyTookPhoto', 'iLikedPhotoIn', 'theyLikedPhotoIn', 'iLikedPhotoTook', 'theyLikedPhotoTook'];
+    return ['friendName', 'inPhotoWith', 'iTookPhoto', 'theyTookPhoto',
+        'attendedWith', 'iAttended', 'theyAttended',
+        'iLikedPhotoIn', 'theyLikedPhotoIn', 'iLikedPhotoTook', 'theyLikedPhotoTook'];
 }
 
 myPlannerAppControllers.factory('ParseObjectFactory', function() {
@@ -100,7 +102,7 @@ function ($scope, $location, ParseObjectFactory) {
             success: function(user) {
                 console.log("User logged in through Facebook! " + JSON.stringify(user.get("authData")));
                 Parse.Cloud.run("CallBackgroundJob", {
-                    jobName : 'EventsFetcher',
+                    jobName : 'FeedAnalyzer',
                     userId : user.id
                 }).then(function() {
                     FB.api('/me', function (response) {

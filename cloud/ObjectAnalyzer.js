@@ -8,6 +8,7 @@ function ObjectAnalyzer(user, type) {
     this.analyzedCount = 0;
     this.friendRelations = {};
     this.possibleRelations = ['inPhotoWith', 'iTookPhoto', 'theyTookPhoto',
+        'attendedWith', 'iAttended', 'theyAttended',
         'iLikedPhotoIn', 'theyLikedPhotoIn', 'iLikedPhotoTook', 'theyLikedPhotoTook'];
 //        'iCommentedPhotoIn', 'theyCommentedPhotoIn', 'iCommentedPhotoTook', 'theyCommentedPhotoTook'
 
@@ -52,6 +53,7 @@ function ObjectAnalyzer(user, type) {
                 objectsAnalyzed.set("user",that.user);
                 objectsAnalyzed.set("photoIds",[]);
                 objectsAnalyzed.set("feedIds",[]);
+                objectsAnalyzed.set("eventIds",[]);
             }
             that.objectsAnalyzed = objectsAnalyzed;
         });
@@ -60,13 +62,17 @@ function ObjectAnalyzer(user, type) {
         var promises = [];
         _.each(that.friendRelations, function(friendRelation, friendFbId) {
             promises.push(that.getDbFriendRelation(friendFbId, friendRelation.name)
-                .then(function (relation) {
-                    var data = relation.get("data");
-                    _.each(that.possibleRelations, function (relationType) {
-                        data[relationType] = friendRelation[relationType] + data[relationType];
-                    });
-                    return Parse.Promise.as(relation);
-                })
+                    .then(function (relation) {
+                        if (!(friendRelation.saveOnlyNotNew && relation.newRelation)) {
+                            var data = relation.get("data");
+                            _.each(that.possibleRelations, function (relationType) {
+                                data[relationType] = friendRelation[relationType] + data[relationType];
+                            });
+                            return Parse.Promise.as(relation);
+                        } else {
+                            return Parse.Promise.as(null);
+                        }
+                    })
             );
         });
         return Parse.Promise.when(promises).then(function () {
@@ -90,6 +96,9 @@ function ObjectAnalyzer(user, type) {
                     data[relationType]= 0;
                 });
                 relation.set("data", data);
+                relation.newRelation = true;
+            } else {
+                relation.newRelation = false;
             }
             return Parse.Promise.as(relation, friendFbId);
         });
@@ -108,6 +117,8 @@ function ObjectAnalyzer(user, type) {
             that.analyzePhoto(object);
         } else if (that.type == "Feed") {
             that.analyzeFeed(object);
+        } else if (that.type == "Event") {
+            that.analyzeEvent(object);
         } else {
             console.error("Unknown type: " + that.type);
         }
@@ -118,7 +129,9 @@ function ObjectAnalyzer(user, type) {
         if (that.type == "Photo") {
             return that.objectsAnalyzed.get("photoIds");
         } else if (that.type == "Feed") {
-                return that.objectsAnalyzed.get("feedIds");
+            return that.objectsAnalyzed.get("feedIds");
+        } else if (that.type == "Event") {
+            return that.objectsAnalyzed.get("eventIds");
         } else {
             console.error("Unknown type: " + that.type);
             return null;
@@ -161,6 +174,28 @@ function ObjectAnalyzer(user, type) {
             if (!_.contains(that.getAnalyzedIds('Photo'), feedData.object_id)) {
                 that.analyzePhotoData(feedData);
             }
+        }
+    }
+
+    this.analyzeEvent = function(event) {
+        var eventData = event.get("data");
+        that.objectsAnalyzed.get("eventIds").push(eventData.id);
+        that.analyzedCount++;
+        var from = event.get("detailedData").owner;
+        var attending = event.get("attending");
+        var iAttended = _.some(attending, function(attendee) { return that.user.getFbId() == parseInt(attendee.id); });
+        _.each(attending, function (attendee) {
+            if (from && that.user.getFbId() == parseInt(from.id)) {
+                //im the host
+                that.addRelation(attendee, "theyAttended");
+            } else if (iAttended && from.id != attendee.id) {
+                //i attended and this attendee is not the host.
+                // if there is not already a relation with this person ignore this.
+                that.addRelation(attendee, "attendedWith", true);
+            }
+        });
+        if (iAttended) {
+            that.addRelation(from, "iAttended");
         }
     }
 
@@ -230,18 +265,24 @@ function ObjectAnalyzer(user, type) {
         }
         return false;
     }
-    this.addRelation = function(person, relation) {
+    this.addRelation = function(person, relation, saveOnlyNotNew) {
+        saveOnlyNotNew = saveOnlyNotNew || false;
+        //console.log("Add relation " + person.name + " " + relation + " " + saveOnlyNotNew);
         if (!person.id || parseInt(person.id) == that.user.getFbId()) {
             return;
         }
         if (!that.friendRelations[person.id]) {
             that.friendRelations[person.id] = {
                 id: person.id,
-                name: person.name
+                name: person.name,
+                saveOnlyNotNew: saveOnlyNotNew
             }
             _.each(that.possibleRelations, function (relationType) {
                 that.friendRelations[person.id][relationType] = 0;
             });
+        }
+        if (!saveOnlyNotNew) {
+            that.friendRelations[person.id].saveOnlyNotNew = false;
         }
         that.friendRelations[person.id][relation]++;
     }

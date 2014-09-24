@@ -21,23 +21,24 @@ function ObjectFetcher(user) {
     }
     this.fetchEvents = function(maxToFetch) {
         var url = 'https://graph.facebook.com/v2.1/me/events?';
-        return that.fetchFromUrl(url, maxToFetch, "Event", 0, 0).then(function () { return that.fetchEventsInvited() });
+        return that.fetchFromUrl(url, maxToFetch, "Event", 0, 0).then(function () { return that.fetchEventsDetail() });
     }
-    this.fetchEventsInvited = function() {
+    this.fetchEventsDetail = function() {
         var Event = Parse.Object.extend("Event");
         var query = new Parse.Query(Event);
         query.equalTo("user", that.user);
         return query.find().then(function (events) {
-            console.log("Getting invited for "+events.length+ " events");
+            console.log("Getting attending/details for "+events.length+ " events");
             var promises = [];
             _.each(events, function(event) {
-                promises.push(that.fetchEventInvited(event));
+                promises.push(that.fetchEventDetail(event));
+                promises.push(that.fetchEventAttending(event));
             })
             return Parse.Promise.when(promises);
         });
     }
-    this.fetchEventInvited = function(event) {
-        var url = 'https://graph.facebook.com/v2.1/'+event.get("data").id+'/invited?&access_token=' + that.user.getFbAccessToken();
+    this.fetchEventAttending = function(event) {
+        var url = 'https://graph.facebook.com/v2.1/'+event.get("data").id+'/attending?&access_token=' + that.user.getFbAccessToken();
         var args = {
             url: url,
             method: 'GET'
@@ -46,7 +47,18 @@ function ObjectFetcher(user) {
             if (!httpResponse.data.data) {
                 console.log("unable to fetch invite data for event.id = " +event.get("data").id);
             }
-            event.set("invited", httpResponse.data.data);
+            event.set("attending", httpResponse.data.data);
+            return event.save();
+        });
+    }
+    this.fetchEventDetail = function(event) {
+        var url = 'https://graph.facebook.com/v2.1/'+event.get("data").id+'?&access_token=' + that.user.getFbAccessToken();
+        var args = {
+            url: url,
+            method: 'GET'
+        };
+        return Parse.Cloud.httpRequest(args).then(function (httpResponse) {
+            event.set("detailedData", httpResponse.data);
             return event.save();
         });
     }
