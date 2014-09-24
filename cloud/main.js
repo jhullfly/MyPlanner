@@ -64,20 +64,26 @@ Parse.Cloud.define("CallBackgroundJob", function(request, response) {
 Parse.Cloud.job("DoEverything", function(request, status) {
     doUserJob(request, status, function(user) {
         var objectFetcher = new OF.ObjectFetcher(user);
-        var photoAnalyzer = new OA.ObjectAnalyzer(user, "Photo");
-        var feedAnalyzer = new OA.ObjectAnalyzer(user, "Feed");
+        var objectAnalyzer = new OA.ObjectAnalyzer(user);
         return objectFetcher.fetchPhotosTaggedIn(1000)
         .then(function() {
             return objectFetcher.fetchPhotosTaken(1000);
-        }).then( function() {
-            return photoAnalyzer.analyze();
         }).then( function() {
             return objectFetcher.fetchFeed(1000);
         }).then( function() {
             return objectFetcher.fetchHome(1000);
         }).then( function() {
-            return feedAnalyzer.analyze();
+            return objectFetcher.fetchEvents(100);
+        }).then( function() {
+            return objectAnalyzer.analyzeAll();
         })
+    });
+});
+
+Parse.Cloud.job("AllAnalyzer", function(request, status) {
+    doUserJob(request, status, function(user) {
+        var objectAnalyzer = new OA.ObjectAnalyzer(user);
+        return objectAnalyzer.analyzeAll();
     });
 });
 
@@ -106,8 +112,8 @@ Parse.Cloud.job("HomeFetcher", function(request, status) {
 
 Parse.Cloud.job("PhotoAnalyzer", function(request, status) {
     doUserJob(request, status, function(user) {
-        var photoAnalyzer = new OA.ObjectAnalyzer(user, "Photo");
-        return photoAnalyzer.analyze();
+        var photoAnalyzer = new OA.ObjectAnalyzer(user);
+        return photoAnalyzer.analyze("Photo");
     });
 });
 
@@ -118,28 +124,16 @@ Parse.Cloud.job("FeedAnalyzer", function(request, status) {
     });
 });
 
-Parse.Cloud.job("AllAnalyzer", function(request, status) {
-    doUserJob(request, status, function(user) {
-        var feedAnalyzer = new OA.ObjectAnalyzer(user, "Feed");
-        var photoAnalyzer = new OA.ObjectAnalyzer(user, "Photo");
-        var eventAnalyzer = new OA.ObjectAnalyzer(user, "Event");
-        return photoAnalyzer.analyze()
-        .then( function () {
-            return eventAnalyzer.analyze();
-        });
-    });
-});
-
 Parse.Cloud.job("EventsFetcher", function(request, status) {
     doUserJob(request, status, function(user) {
         var objectFetcher = new OF.ObjectFetcher(user);
-        return objectFetcher.fetchEvents(1000);
+        return objectFetcher.fetchEvents(100);
     });
 });
 
 Parse.Cloud.job("EventsAnalyzer", function(request, status) {
     doUserJob(request, status, function(user) {
-        var eventAnalyzer = new OA.ObjectAnalyzer(user, "Event");
-        return eventAnalyzer.analyze();
+        var eventAnalyzer = new OA.ObjectAnalyzer(user);
+        return eventAnalyzer.analyze("Event");
     });
 });

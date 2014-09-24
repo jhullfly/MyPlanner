@@ -1,9 +1,8 @@
 var _ = require('underscore');
 
-function ObjectAnalyzer(user, type) {
+function ObjectAnalyzer(user) {
     var that = this;
     this.user = user;
-    this.type = type;
     this.objectsAnalyzed = null;
     this.analyzedCount = 0;
     this.friendRelations = {};
@@ -12,34 +11,51 @@ function ObjectAnalyzer(user, type) {
         'iLikedPhotoIn', 'theyLikedPhotoIn', 'iLikedPhotoTook', 'theyLikedPhotoTook'];
 //        'iCommentedPhotoIn', 'theyCommentedPhotoIn', 'iCommentedPhotoTook', 'theyCommentedPhotoTook'
 
-    this.analyze = function() {
-        return that.initializeObjectsAnalyzed().then(function () {
-            return that.analyzeFrom(0);
-        });
+    this.analyze = function(type) {
+        return that.initializeObjectsAnalyzed()
+            .then(function () {
+                return that.initializeFriendRelations();
+            }).then(function () {
+                return that.analyzeFrom(0, type);
+            }).then(function () {
+                return that.saveRelations();
+            });
     }
 
-    this.analyzeFrom = function(skip) {
+    this.analyzeAll = function() {
+        return that.initializeObjectsAnalyzed()
+            .then(function () {
+                return that.initializeFriendRelations();
+            }).then(function () {
+                return that.analyzeFrom(0, "Photo");
+            }).then(function () {
+                return that.analyzeFrom(0, "Feed");
+            }).then(function () {
+                return that.analyzeFrom(0, "Event");
+            }).then(function () {
+                return that.saveRelations();
+            });
+    }
+
+    this.analyzeFrom = function(skip, type) {
         var batchSize = 1000;
-        var Object = Parse.Object.extend(that.type);
+        var Object = Parse.Object.extend(type);
         var query = new Parse.Query(Object);
         query.equalTo("user", that.user);
         query.ascending("createdAt");
         query.skip(skip);
         query.limit(batchSize);
         return query.find().then( function (objects) {
-            console.log("Retrieved " + objects.length + ' ' + that.type);
+            console.log("Retrieved " + objects.length + ' ' + type);
             _.each(objects, function(object) {
-                if (!_.contains(that.getAnalyzedIds(), object.get("data").id)) {
-                    that.analyzeObject(object);
+                if (!_.contains(that.getAnalyzedIds(type), object.get("data").id)) {
+                    that.analyzeObject(object, type);
                 }
             });
             if (objects.length != 0) {
-                return that.analyzeFrom(skip+batchSize);
+                return that.analyzeFrom(skip+batchSize, type);
             } else {
-                console.log("Saving "+that.analyzedCount + " " + that.type + " analysis");
-                return that.saveRelations().then(function () {
-                    return that.objectsAnalyzed.save();
-                });
+                return Parse.Promise.as();
             }
         });
     }
@@ -56,51 +72,7 @@ function ObjectAnalyzer(user, type) {
                 objectsAnalyzed.set("eventIds",[]);
             }
             that.objectsAnalyzed = objectsAnalyzed;
-        });
-    }
-    this.saveRelations = function() {
-        var promises = [];
-        _.each(that.friendRelations, function(friendRelation, friendFbId) {
-            promises.push(that.getDbFriendRelation(friendFbId, friendRelation.name)
-                    .then(function (relation) {
-                        if (!(friendRelation.saveOnlyNotNew && relation.newRelation)) {
-                            var data = relation.get("data");
-                            _.each(that.possibleRelations, function (relationType) {
-                                data[relationType] = friendRelation[relationType] + data[relationType];
-                            });
-                            return Parse.Promise.as(relation);
-                        } else {
-                            return Parse.Promise.as(null);
-                        }
-                    })
-            );
-        });
-        return Parse.Promise.when(promises).then(function () {
-            return Parse.Object.saveAll(arguments);
-        });
-    }
-
-    this.getDbFriendRelation = function(friendFbId, name) {
-        var FriendRelation = Parse.Object.extend("FriendRelation");
-        var query = new Parse.Query(FriendRelation);
-        query.equalTo("userFbId", that.user.getFbId());
-        query.equalTo("friendFbId", parseInt(friendFbId));
-        return query.first().then(function (relation) {
-            if (!relation) {
-                relation = new FriendRelation();
-                relation.set("userFbId", user.getFbId());
-                relation.set("friendFbId", parseInt(friendFbId));
-                relation.set("friendName", name);
-                var data = {};
-                _.each(that.possibleRelations, function (relationType) {
-                    data[relationType]= 0;
-                });
-                relation.set("data", data);
-                relation.newRelation = true;
-            } else {
-                relation.newRelation = false;
-            }
-            return Parse.Promise.as(relation, friendFbId);
+            return Parse.Promise.as();
         });
     }
 
@@ -112,28 +84,27 @@ function ObjectAnalyzer(user, type) {
         console.log(msg);
     }
 
-    this.analyzeObject = function(object) {
-        if (that.type == "Photo") {
+    this.analyzeObject = function(object, type) {
+        if (type == "Photo") {
             that.analyzePhoto(object);
-        } else if (that.type == "Feed") {
+        } else if (type == "Feed") {
             that.analyzeFeed(object);
-        } else if (that.type == "Event") {
+        } else if (type == "Event") {
             that.analyzeEvent(object);
         } else {
-            console.error("Unknown type: " + that.type);
+            console.error("Unknown type: " + type);
         }
     }
 
     this.getAnalyzedIds = function(type) {
-        type = type || that.type;
-        if (that.type == "Photo") {
+        if (type == "Photo") {
             return that.objectsAnalyzed.get("photoIds");
-        } else if (that.type == "Feed") {
+        } else if (type == "Feed") {
             return that.objectsAnalyzed.get("feedIds");
-        } else if (that.type == "Event") {
+        } else if (type == "Event") {
             return that.objectsAnalyzed.get("eventIds");
         } else {
-            console.error("Unknown type: " + that.type);
+            console.error("Unknown type: " + type);
             return null;
         }
     }
@@ -183,15 +154,17 @@ function ObjectAnalyzer(user, type) {
         that.analyzedCount++;
         var from = event.get("detailedData").owner;
         var attending = event.get("attending");
-        var iAttended = _.some(attending, function(attendee) { return that.user.getFbId() == parseInt(attendee.id); });
+        var iAttended = _.some(attending, function(attendee) { return attendee && that.user.getFbId() == parseInt(attendee.id); });
         _.each(attending, function (attendee) {
-            if (from && that.user.getFbId() == parseInt(from.id)) {
-                //im the host
-                that.addRelation(attendee, "theyAttended");
-            } else if (iAttended && from.id != attendee.id) {
-                //i attended and this attendee is not the host.
-                // if there is not already a relation with this person ignore this.
-                that.addRelation(attendee, "attendedWith", true);
+            if (attendee) {
+                if (from && that.user.getFbId() == parseInt(from.id)) {
+                    //im the host
+                    that.addRelation(attendee, "theyAttended");
+                } else if (iAttended && from.id != attendee.id) {
+                    //i attended and this attendee is not the host.
+                    // if there is not already a relation with this person ignore this.
+                    that.addRelation(attendee, "attendedWith", true);
+                }
             }
         });
         if (iAttended) {
@@ -265,6 +238,34 @@ function ObjectAnalyzer(user, type) {
         }
         return false;
     }
+
+    this.initializeFriendRelations = function() {
+        var FriendRelation = Parse.Object.extend("FriendRelation");
+        var query = new Parse.Query(FriendRelation);
+        query.equalTo("user", that.user);
+        query.limit(1000);
+        return query.find().then(function (relations) {
+            _.each(relations, function(relation) {
+                that.friendRelations[relation.get("friendFbId").toString()] = relation;
+            });
+            return Parse.Promise.as();
+        });
+    }
+
+    this.saveRelations = function() {
+        var relations = [];
+        _.each(that.friendRelations, function(friendRelation, friendFbId) {
+            if (!(friendRelation.saveOnlyNotNew && friendRelation.newRelation)) {
+                relations.push(friendRelation);
+            }
+        });
+        console.log("Saving "+that.analyzedCount + " object analysis with "+
+            relations.length+" relations (ignoring "+(Object.keys(that.friendRelations).length-relations.length)+")");
+        return Parse.Object.saveAll(relations).then(function () {
+            return that.objectsAnalyzed.save();
+        });
+    }
+
     this.addRelation = function(person, relation, saveOnlyNotNew) {
         saveOnlyNotNew = saveOnlyNotNew || false;
         //console.log("Add relation " + person.name + " " + relation + " " + saveOnlyNotNew);
@@ -272,20 +273,27 @@ function ObjectAnalyzer(user, type) {
             return;
         }
         if (!that.friendRelations[person.id]) {
-            that.friendRelations[person.id] = {
-                id: person.id,
-                name: person.name,
-                saveOnlyNotNew: saveOnlyNotNew
-            }
+            var FriendRelation = Parse.Object.extend("FriendRelation");
+            var newRelation = new FriendRelation();
+            newRelation.set("userFbId", that.user.getFbId());
+            newRelation.set("friendFbId", parseInt(person.id));
+            newRelation.set("friendName", person.name);
+            newRelation.saveOnlyNotNew = saveOnlyNotNew;
+            newRelation.newRelation = true;
+            var data = {};
             _.each(that.possibleRelations, function (relationType) {
-                that.friendRelations[person.id][relationType] = 0;
+                data[relationType] = 0;
             });
+            newRelation.set("data", data);
+            that.friendRelations[person.id] = newRelation;
         }
         if (!saveOnlyNotNew) {
             that.friendRelations[person.id].saveOnlyNotNew = false;
         }
-        that.friendRelations[person.id][relation]++;
+        that.friendRelations[person.id].get("data")[relation]++;
     }
+
+
 }
 
 exports.ObjectAnalyzer = ObjectAnalyzer;

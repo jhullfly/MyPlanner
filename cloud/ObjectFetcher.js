@@ -3,25 +3,36 @@ var _ = require('underscore');
 function ObjectFetcher(user) {
     var that = this;
     this.user = user;
+    this.fetched = null;
     this.fetchPhotosTaggedIn = function(maxToFetch) {
         var url = 'https://graph.facebook.com/v2.1/me/photos?';
-        return that.fetchFromUrl(url, maxToFetch, "Photo", 0, 0);
+        return that.initializeFetched().then( function () {
+            return that.fetchFromUrl(url, maxToFetch, "Photo", 0, 0);
+        });
     }
     this.fetchPhotosTaken = function(maxToFetch) {
         var url = 'https://graph.facebook.com/v2.1/me/photos/uploaded?';
-        return that.fetchFromUrl(url, maxToFetch, "Photo", 0, 0);
+        return that.initializeFetched().then( function () {
+            return that.fetchFromUrl(url, maxToFetch, "Photo", 0, 0);
+        });
     }
     this.fetchFeed = function(maxToFetch) {
         var url = 'https://graph.facebook.com/v2.1/me/feed?';
-        return that.fetchFromUrl(url, maxToFetch, "Feed", 0, 0);
+        return that.initializeFetched().then( function () {
+            return that.fetchFromUrl(url, maxToFetch, "Feed", 0, 0);
+        });
     }
     this.fetchHome = function(maxToFetch) {
         var url = 'https://graph.facebook.com/v2.1/me/home?';
-        return that.fetchFromUrl(url, maxToFetch, "Feed", 0, 0);
+        return that.initializeFetched().then( function () {
+            return that.fetchFromUrl(url, maxToFetch, "Feed", 0, 0);
+        });
     }
     this.fetchEvents = function(maxToFetch) {
         var url = 'https://graph.facebook.com/v2.1/me/events?';
-        return that.fetchFromUrl(url, maxToFetch, "Event", 0, 0).then(function () { return that.fetchEventsDetail() });
+        return that.initializeFetched().then( function () {
+            return that.fetchFromUrl(url, maxToFetch, "Event", 0, 0).then(function () { return that.fetchEventsDetail() });
+        });
     }
     this.fetchEventsDetail = function() {
         var Event = Parse.Object.extend("Event");
@@ -34,7 +45,9 @@ function ObjectFetcher(user) {
                 promises.push(that.fetchEventDetail(event));
                 promises.push(that.fetchEventAttending(event));
             })
-            return Parse.Promise.when(promises);
+            return Parse.Promise.when(promises).then(function() {
+                return Parse.Object.saveAll(events);
+            });
         });
     }
     this.fetchEventAttending = function(event) {
@@ -48,7 +61,7 @@ function ObjectFetcher(user) {
                 console.log("unable to fetch invite data for event.id = " +event.get("data").id);
             }
             event.set("attending", httpResponse.data.data);
-            return event.save();
+            return Parse.Promise.as();
         });
     }
     this.fetchEventDetail = function(event) {
@@ -59,7 +72,7 @@ function ObjectFetcher(user) {
         };
         return Parse.Cloud.httpRequest(args).then(function (httpResponse) {
             event.set("detailedData", httpResponse.data);
-            return event.save();
+            return Parse.Promise.as();
         });
     }
     this.fetchFromUrl = function(url, maxToFetch, type, fetched, added) {
@@ -74,101 +87,109 @@ function ObjectFetcher(user) {
                 added += newAdded;
                 if (fetched >= maxToFetch) {
                     console.log("Fetched " + fetched + ". Added " + added + ". Hit max. Exiting");
-                    return Parse.Promise.as(fetched, added);
+                    return that.fetched.save().then(function() {
+                        return Parse.Promise.as(fetched, added);
+                    });
                 }
                 if (!httpResponse.data.paging || !httpResponse.data.paging.next) {
                     console.log("Fetched " + fetched + ". Added " + added + ". No more paging data. Exiting");
-                    return Parse.Promise.as(fetched, added);
+                    return that.fetched.save().then(function() {
+                        return Parse.Promise.as(fetched, added);
+                    });
                 }
                 var next = httpResponse.data.paging.next;
-                console.log("Fetched " + fetched + ". Added " + added + ". Fetching more from " + next);
+                console.log("Fetched " + fetched + " " + type + ". Added " + added + ". Fetching more");
                 return that.fetchFromUrl(next, maxToFetch, type, fetched, added);
             });
         });
     }
 
     this.saveObjects = function(objects, type) {
-        var promises = [];
+        var dbObjects = [];
         _.each(objects, function(object) {
-            promises.push(that.saveObject(object, type));
+            if (!_.contains(that.getFetchedIds(type), object.id)) {
+                dbObjects.push(that.buildObject(object, type));
+                that.getFetchedIds(type).push(object.id);
+            }
         });
-        return Parse.Promise.when(promises).then(function() {
-            var added = _.reduce(arguments, function(memo, num) {return memo+num}, 0);
-            return Parse.Promise.as(added);
-        });
-
+        return Parse.Object.saveAll(dbObjects)
+            .then(function() {
+                return Parse.Promise.as(dbObjects.length);
+            });
     }
-    this.saveObject = function(object, type) {
-        if (type == 'Photo') {
-            return that.savePhoto(object);
-        } else if (type == 'Feed') {
-            return that.saveFeed(object);
-        } else if (type == 'Event') {
-            return that.saveEvent(object);
+
+    this.initializeFetched = function() {
+        if (that.fetched) {
+            return Parse.Promise.as();
+        }
+        var Fetched = Parse.Object.extend("Fetched");
+        var query = new Parse.Query(Fetched);
+        query.equalTo("user", that.user);
+        return query.first().then(function (fetched) {
+            if (!fetched) {
+                fetched = new Fetched();
+                fetched.set("user",that.user);
+                fetched.set("photoIds",[]);
+                fetched.set("feedIds",[]);
+                fetched.set("eventIds",[]);
+            }
+            that.fetched = fetched;
+            return Parse.Promise.as();
+        });
+    }
+
+    this.getFetchedIds = function(type) {
+        if (type == "Photo") {
+            return that.fetched.get("photoIds");
+        } else if (type == "Feed") {
+            return that.fetched.get("feedIds");
+        } else if (type == "Event") {
+            return that.fetched.get("eventIds");
         } else {
-            return Parse.Promise.error("unknown object type '"+type+"'");
+            console.error("Unknown type: " + type);
+            return null;
         }
     }
-    this.savePhoto = function(photo) {
+
+    this.buildObject = function(object, type) {
+        if (type == 'Photo') {
+            return that.buildPhoto(object);
+        } else if (type == 'Feed') {
+            return that.buildFeed(object);
+        } else if (type == 'Event') {
+            return that.buildEvent(object);
+        } else {
+            console.log("unknown object type '"+type+"'");
+            return null;
+        }
+    }
+    this.buildPhoto = function(photo) {
         var Photo = Parse.Object.extend("Photo");
-        var query = new Parse.Query(Photo);
-        query.equalTo("fbId", parseInt(photo.id));
-        query.equalTo("user", that.user);
-        return query.first().then( function (foundPhotoDB) {
-            if (!foundPhotoDB) {
-                var photoDB = new Photo();
-                photoDB.set("data", photo);
-                photoDB.set("fbId", parseInt(photo.id));
-                photoDB.set("creatorFbId", parseInt(photo.from.id));
-                photoDB.set("user", that.user);
-                return photoDB.save().then( function (photoDB) {
-                    return Parse.Promise.as(1);
-                });
-            } else {
-                return Parse.Promise.as(0);
-            }
-        });
+        var photoDB = new Photo();
+        photoDB.set("data", photo);
+        photoDB.set("fbId", parseInt(photo.id));
+        photoDB.set("creatorFbId", parseInt(photo.from.id));
+        photoDB.set("user", that.user);
+        return photoDB;
     }
-    this.saveFeed = function(feed) {
+    this.buildFeed = function(feed) {
         var Feed = Parse.Object.extend("Feed");
-        var query = new Parse.Query(Feed);
-        query.equalTo("fbId", feed.id);
-        query.equalTo("user", that.user);
-        return query.first().then( function (foundFeedDB) {
-            if (!foundFeedDB) {
-                var feedDB = new Feed();
-                feedDB.set("data", feed);
-                feedDB.set("fbId", feed.id);
-                feedDB.set("creatorFbId", parseInt(feed.from.id));
-                feedDB.set("type", feed.type);
-                feedDB.set("status_type", feed.status_type);
-                feedDB.set("user", that.user);
-                return feedDB.save().then( function (feedDB) {
-                    return Parse.Promise.as(1);
-                });
-            } else {
-                return Parse.Promise.as(0);
-            }
-        });
+        var feedDB = new Feed();
+        feedDB.set("data", feed);
+        feedDB.set("fbId", feed.id);
+        feedDB.set("creatorFbId", parseInt(feed.from.id));
+        feedDB.set("type", feed.type);
+        feedDB.set("status_type", feed.status_type);
+        feedDB.set("user", that.user);
+        return feedDB;
     }
-    this.saveEvent = function(event) {
+    this.buildEvent = function(event) {
         var Event = Parse.Object.extend("Event");
-        var query = new Parse.Query(Event);
-        query.equalTo("fbId", event.id);
-        query.equalTo("user", that.user);
-        return query.first().then( function (foundEventDB) {
-            if (!foundEventDB) {
-                var eventDB = new Event();
-                eventDB.set("data", event);
-                eventDB.set("fbId", event.id);
-                eventDB.set("user", that.user);
-                return eventDB.save().then( function (eventDB) {
-                    return Parse.Promise.as(1);
-                });
-            } else {
-                return Parse.Promise.as(0);
-            }
-        });
+        var eventDB = new Event();
+        eventDB.set("data", event);
+        eventDB.set("fbId", event.id);
+        eventDB.set("user", that.user);
+        return eventDB;
     }
 }
 
